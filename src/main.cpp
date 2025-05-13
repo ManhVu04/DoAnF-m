@@ -287,6 +287,9 @@ void TaskAutoWarning(void *pvParameters);
 // String snHumi[] = {...};
 // String snSoilMoisture[] = {...};
 
+unsigned long lastScreenSwitch = 0;
+const unsigned long screenSwitchInterval = 3000; // 3 giây đổi màn hình
+
 void setup() {
   Serial.begin(115200);
   // Đọc data setup từ eeprom
@@ -410,6 +413,17 @@ int countSCREEN9 = 0;
 // Task hiển thị OLED
 void TaskOLEDDisplay(void *pvParameters) {
   while (1) {
+      // Luân phiên chuyển màn hình nếu đã kết nối xong
+      if (screenOLED == SCREEN1 || screenOLED == SCREEN2 || screenOLED == SCREEN3) {
+        unsigned long now = millis();
+        if (now - lastScreenSwitch > screenSwitchInterval) {
+          lastScreenSwitch = now;
+          if (screenOLED == SCREEN1) screenOLED = SCREEN2;
+          else if (screenOLED == SCREEN2) screenOLED = SCREEN3;
+          else screenOLED = SCREEN1;
+        }
+      }
+
       switch(screenOLED) {
         case SCREEN0: // Hiệu ứng khởi động
           for(int j = 0; j < 3; j++) {
@@ -1217,14 +1231,13 @@ void connectToAWS() {
     wifiClient.setPrivateKey(AWS_CERT_PRIVATE);
 
     mqttClient.setServer(AWS_IOT_ENDPOINT, AWS_IOT_PORT);
-    // Nếu bạn có hàm messageHandler thì thêm dòng này:
-    // mqttClient.setCallback(messageHandler);
 
     Serial.println("Connecting to AWS IoT Core...");
     while (!mqttClient.connected()) {
         if (mqttClient.connect(THING_NAME)) {
             Serial.println("Connected to AWS IoT Core!");
             mqttClient.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
+            screenOLED = SCREEN7; // Đã kết nối AWS
         } else {
             Serial.print("AWS IoT connection failed, rc=");
             Serial.print(mqttClient.state());
@@ -1238,6 +1251,7 @@ void connectToAWS() {
       Serial.print(".");
     }
     Serial.println("Time synced!");
+    screenOLED = SCREEN1; // Bắt đầu hiển thị thông số sau khi sync time
 }
 
 // Gửi dữ liệu cảm biến lên AWS IoT Core
